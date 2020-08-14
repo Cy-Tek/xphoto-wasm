@@ -1,18 +1,51 @@
+use photon_rs::transform::SamplingFilter;
+use photon_rs::PhotonImage;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
-use photon_rs::PhotonImage;
 
 #[wasm_bindgen]
-extern {
-    pub fn alert(s: &str);
+pub struct ImageManager {
+    base_image: PhotonImage,
+    base_canvas: HtmlCanvasElement,
+    base_preview_image: Option<PhotonImage>,
+    filter_layers: Vec<PhotonImage>,
+    filter_previews: Vec<PhotonImage>,
 }
 
 #[wasm_bindgen]
-pub fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
+impl ImageManager {
+    pub fn load_from_canvas(canvas: HtmlCanvasElement) -> Self {
+        let ctx = Self::get_context_from_canvas(&canvas);
+        let image = photon_rs::open_image(canvas.clone(), ctx);
+
+        Self {
+            base_image: image,
+            base_canvas: canvas,
+            base_preview_image: None,
+            filter_layers: vec![],
+            filter_previews: vec![],
+        }
+    }
+
+    pub fn gen_filter_preview(&mut self, max_width: u32, max_height: u32) {
+        let min_max = max_width.min(max_height);
+        let (img_height, img_width) = (self.base_image.get_height(), self.base_image.get_width());
+        let max_img_dimension = img_height.max(img_width);
+        let ratio = min_max as f64 / max_img_dimension as f64;
+        let resized_image = photon_rs::transform::resize(
+            &self.base_image,
+            (img_width as f64 * ratio) as u32,
+            (img_height as f64 * ratio) as u32,
+            SamplingFilter::CatmullRom,
+        );
+
+        self.base_preview_image = Some(resized_image);
+    }
 }
 
-#[wasm_bindgen]
-pub fn filter_image(mut image: PhotonImage, name: &str) {
-    photon_rs::filters::filter(&mut image, name);
+impl ImageManager {
+    fn get_context_from_canvas(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
+        let ctx: JsValue = canvas.get_context("2d").unwrap().unwrap().into();
+        ctx.into()
+    }
 }
