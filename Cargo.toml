@@ -13,6 +13,8 @@ crate-type = ["cdylib"]
 wasm-bindgen = "0.2"
 wee_alloc = { version = "0.4.5", optional = true }
 photon-rs = { git = "https://github.com/Cy-Tek/photon" }
+log = "0.4.6"
+wasm-logger = "0.2.0"
 
 [dependencies.web-sys]
 version = "0.3"

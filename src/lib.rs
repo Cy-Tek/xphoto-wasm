@@ -4,6 +4,11 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
+#[wasm_bindgen(start)]
+pub fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
+}
+
 #[wasm_bindgen]
 pub struct ImageManager {
     base_image: PhotonImage,
@@ -47,18 +52,34 @@ impl ImageManager {
         let ctx = Self::get_context_from_canvas(&canvas);
 
         if let Some(image) = self.filter_previews.get(filter_name) {
-            let copy = photon_rs::base64_to_image(&image.get_base64());
+            let copy = PhotonImage::new_from_byteslice(image.get_raw_pixels());
             photon_rs::putImageData(canvas, ctx, copy);
         } else {
-            let mut copy = photon_rs::base64_to_image(&self.base_image.get_base64());
+            if self.base_preview_image.is_none() {
+                self.gen_filter_preview(canvas.width(), canvas.height());
+            }
 
-            photon_rs::filters::filter(&mut copy, filter_name);
+            if let Some(ref base_image) = self.base_preview_image {
+                let mut copy = PhotonImage::new(
+                    base_image.get_raw_pixels(),
+                    base_image.get_width(),
+                    base_image.get_height(),
+                );
+                photon_rs::filters::filter(&mut copy, filter_name);
 
-            let filtered_copy = photon_rs::base64_to_image(&copy.get_base64());
-            self.filter_previews
-                .insert(filter_name.into(), filtered_copy);
+                let filtered_copy =
+                    PhotonImage::new(copy.get_raw_pixels(), copy.get_width(), copy.get_height());
+                self.filter_previews
+                    .insert(filter_name.into(), filtered_copy);
 
-            photon_rs::putImageData(canvas, ctx, copy);
+                log::info!("Canvas Width: {} - Canvas Height: {}", canvas.width(), canvas.height());
+                log::info!("Image Width: {} - Image Height: {}", copy.get_width(), copy.get_height());
+
+                canvas.set_width(copy.get_width());
+                canvas.set_height(copy.get_height());
+
+                photon_rs::putImageData(canvas, ctx, copy);
+            }
         }
     }
 }
