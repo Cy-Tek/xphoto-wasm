@@ -1,5 +1,6 @@
 use photon_rs::transform::SamplingFilter;
 use photon_rs::PhotonImage;
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
@@ -9,7 +10,7 @@ pub struct ImageManager {
     base_canvas: HtmlCanvasElement,
     base_preview_image: Option<PhotonImage>,
     filter_layers: Vec<PhotonImage>,
-    filter_previews: Vec<PhotonImage>,
+    filter_previews: HashMap<String, PhotonImage>,
 }
 
 #[wasm_bindgen]
@@ -23,7 +24,7 @@ impl ImageManager {
             base_canvas: canvas,
             base_preview_image: None,
             filter_layers: vec![],
-            filter_previews: vec![],
+            filter_previews: HashMap::new(),
         }
     }
 
@@ -40,6 +41,25 @@ impl ImageManager {
         );
 
         self.base_preview_image = Some(resized_image);
+    }
+
+    pub fn draw_filter_preview(&mut self, canvas: HtmlCanvasElement, filter_name: &str) {
+        let ctx = Self::get_context_from_canvas(&canvas);
+
+        if let Some(image) = self.filter_previews.get(filter_name) {
+            let copy = photon_rs::base64_to_image(&image.get_base64());
+            photon_rs::putImageData(canvas, ctx, copy);
+        } else {
+            let mut copy = photon_rs::base64_to_image(&self.base_image.get_base64());
+
+            photon_rs::filters::filter(&mut copy, filter_name);
+
+            let filtered_copy = photon_rs::base64_to_image(&copy.get_base64());
+            self.filter_previews
+                .insert(filter_name.into(), filtered_copy);
+
+            photon_rs::putImageData(canvas, ctx, copy);
+        }
     }
 }
 
