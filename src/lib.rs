@@ -1,7 +1,7 @@
 pub mod filter;
 
 use photon_rs::transform::SamplingFilter;
-use photon_rs::PhotonImage;
+use photon_rs::{PhotonImage, base64_to_image};
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
@@ -17,8 +17,9 @@ pub struct ImageManager {
     base_image: PhotonImage,
     base_canvas: HtmlCanvasElement,
     base_preview_image: Option<PhotonImage>,
-    filter_layers: Vec<PhotonImage>,
+    filter_layers: HashMap<String, PhotonImage>,
     filter_previews: HashMap<String, PhotonImage>,
+    filter_order: Vec<String>
 }
 
 #[wasm_bindgen]
@@ -31,8 +32,9 @@ impl ImageManager {
             base_image: image,
             base_canvas: canvas,
             base_preview_image: None,
-            filter_layers: vec![],
+            filter_layers: HashMap::new(),
             filter_previews: HashMap::new(),
+            filter_order: Vec::new()
         }
     }
 
@@ -81,6 +83,39 @@ impl ImageManager {
                 photon_rs::putImageData(canvas, ctx, copy);
             }
         }
+    }
+
+    pub fn add_filter(&mut self, canvas: HtmlCanvasElement, filter: FilterType) {
+        let ctx = Self::get_context_from_canvas(&canvas);
+        let filter_name = get_filter_name(filter);
+
+        let mut copy = if self.filter_order.is_empty() {
+            PhotonImage::new(
+                self.base_image.get_raw_pixels(),
+                self.base_image.get_width(),
+                self.base_image.get_height()
+            )
+        } else {
+            if let Some(image) = self.filter_layers.get_mut(self.filter_order.last().unwrap()) {
+                PhotonImage::new(
+                    image.get_raw_pixels(),
+                    image.get_width(),
+                    image.get_height()
+                )
+            } else {
+                PhotonImage::new(
+                    self.base_image.get_raw_pixels(),
+                    self.base_image.get_width(),
+                    self.base_image.get_height()
+                )
+            }
+        };
+
+        photon_rs::filters::filter(&mut copy, &filter_name);
+        photon_rs::putImageData(canvas, ctx, &mut copy);
+
+        self.filter_layers.insert(filter_name.clone(), copy);
+        self.filter_order.push(filter_name);
     }
 }
 
