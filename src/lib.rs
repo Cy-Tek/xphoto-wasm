@@ -1,8 +1,11 @@
+pub mod filter;
+
 use photon_rs::transform::SamplingFilter;
 use photon_rs::PhotonImage;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
+use crate::filter::{FilterType, get_filter_name};
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -48,10 +51,11 @@ impl ImageManager {
         self.base_preview_image = Some(resized_image);
     }
 
-    pub fn draw_filter_preview(&mut self, canvas: HtmlCanvasElement, filter_name: &str) {
+    pub fn draw_filter_preview(&mut self, canvas: HtmlCanvasElement, filter: FilterType) {
         let ctx = Self::get_context_from_canvas(&canvas);
+        let filter_name = get_filter_name(filter);
 
-        if let Some(image) = self.filter_previews.get_mut(filter_name) {
+        if let Some(image) = self.filter_previews.get_mut(&filter_name) {
             photon_rs::putImageData(canvas, ctx, image);
         } else {
             if self.base_preview_image.is_none() {
@@ -64,12 +68,12 @@ impl ImageManager {
                     base_image.get_width(),
                     base_image.get_height(),
                 );
-                photon_rs::filters::filter(&mut copy, filter_name);
+                photon_rs::filters::filter(&mut copy, &filter_name);
 
                 self.filter_previews
-                    .insert(filter_name.into(), copy);
+                    .insert(filter_name.clone().into(), copy);
 
-                let copy = self.filter_previews.get_mut(filter_name).unwrap();
+                let copy = self.filter_previews.get_mut(&filter_name).unwrap();
 
                 canvas.set_width(copy.get_width());
                 canvas.set_height(copy.get_height());
