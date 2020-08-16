@@ -42,7 +42,7 @@ impl ImageManager {
             &self.base_image,
             (img_width as f64 * ratio) as u32,
             (img_height as f64 * ratio) as u32,
-            SamplingFilter::CatmullRom,
+            SamplingFilter::Lanczos3,
         );
 
         self.base_preview_image = Some(resized_image);
@@ -51,9 +51,8 @@ impl ImageManager {
     pub fn draw_filter_preview(&mut self, canvas: HtmlCanvasElement, filter_name: &str) {
         let ctx = Self::get_context_from_canvas(&canvas);
 
-        if let Some(image) = self.filter_previews.get(filter_name) {
-            let copy = PhotonImage::new_from_byteslice(image.get_raw_pixels());
-            photon_rs::putImageData(canvas, ctx, copy);
+        if let Some(image) = self.filter_previews.get_mut(filter_name) {
+            photon_rs::putImageData(canvas, ctx, image);
         } else {
             if self.base_preview_image.is_none() {
                 self.gen_filter_preview(canvas.width(), canvas.height());
@@ -67,10 +66,10 @@ impl ImageManager {
                 );
                 photon_rs::filters::filter(&mut copy, filter_name);
 
-                let filtered_copy =
-                    PhotonImage::new(copy.get_raw_pixels(), copy.get_width(), copy.get_height());
                 self.filter_previews
-                    .insert(filter_name.into(), filtered_copy);
+                    .insert(filter_name.into(), copy);
+
+                let copy = self.filter_previews.get_mut(filter_name).unwrap();
 
                 canvas.set_width(copy.get_width());
                 canvas.set_height(copy.get_height());

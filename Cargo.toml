@@ -5,6 +5,9 @@ authors = ["Josh Hannaford <hannaford.joshua55@gmail.com>"]
 description = "This library provides the image manipulation tools necessary for the XPhoto app."
 license = "MIT/Apache-2.0"
 edition = "2018"
+exclude = [
+    "pkg/*"
+]
 
 [lib]
 crate-type = ["cdylib"]
