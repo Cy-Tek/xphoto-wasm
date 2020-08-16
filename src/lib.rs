@@ -72,9 +72,6 @@ impl ImageManager {
                 self.filter_previews
                     .insert(filter_name.into(), filtered_copy);
 
-                log::info!("Canvas Width: {} - Canvas Height: {}", canvas.width(), canvas.height());
-                log::info!("Image Width: {} - Image Height: {}", copy.get_width(), copy.get_height());
-
                 canvas.set_width(copy.get_width());
                 canvas.set_height(copy.get_height());
 
