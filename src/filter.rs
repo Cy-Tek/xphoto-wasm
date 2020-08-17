@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 #[repr(u8)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum FilterType {
     Oceanic,
     Islands,

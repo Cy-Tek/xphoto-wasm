@@ -17,9 +17,9 @@ pub struct ImageManager {
     base_image: PhotonImage,
     base_canvas: HtmlCanvasElement,
     base_preview_image: Option<PhotonImage>,
-    filter_layers: HashMap<String, PhotonImage>,
-    filter_previews: HashMap<String, PhotonImage>,
-    filter_order: Vec<String>
+    filter_layers: HashMap<FilterType, PhotonImage>,
+    filter_previews: HashMap<FilterType, PhotonImage>,
+    filter_order: Vec<FilterType>
 }
 
 #[wasm_bindgen]
@@ -57,7 +57,7 @@ impl ImageManager {
         let ctx = Self::get_context_from_canvas(&canvas);
         let filter_name = get_filter_name(filter);
 
-        if let Some(image) = self.filter_previews.get_mut(&filter_name) {
+        if let Some(image) = self.filter_previews.get_mut(&filter) {
             photon_rs::putImageData(canvas, ctx, image);
         } else {
             if self.base_preview_image.is_none() {
@@ -73,9 +73,9 @@ impl ImageManager {
                 photon_rs::filters::filter(&mut copy, &filter_name);
 
                 self.filter_previews
-                    .insert(filter_name.clone().into(), copy);
+                    .insert(filter, copy);
 
-                let copy = self.filter_previews.get_mut(&filter_name).unwrap();
+                let copy = self.filter_previews.get_mut(&filter).unwrap();
 
                 canvas.set_width(copy.get_width());
                 canvas.set_height(copy.get_height());
@@ -85,8 +85,8 @@ impl ImageManager {
         }
     }
 
-    pub fn add_filter(&mut self, canvas: HtmlCanvasElement, filter: FilterType) {
-        let ctx = Self::get_context_from_canvas(&canvas);
+    pub fn add_filter(&mut self, filter: FilterType) {
+        let ctx = Self::get_context_from_canvas(&self.base_canvas);
         let filter_name = get_filter_name(filter);
 
         let mut copy = if self.filter_order.is_empty() {
@@ -112,10 +112,51 @@ impl ImageManager {
         };
 
         photon_rs::filters::filter(&mut copy, &filter_name);
-        photon_rs::putImageData(canvas, ctx, &mut copy);
+        photon_rs::putImageData(self.base_canvas.clone(), ctx, &mut copy);
 
-        self.filter_layers.insert(filter_name.clone(), copy);
-        self.filter_order.push(filter_name);
+        self.filter_layers.insert(filter, copy);
+        self.filter_order.push(filter);
+    }
+
+    pub fn remove_filter(&mut self, filter: FilterType) {
+        if let Some((ix, name)) = self.filter_order.iter().enumerate().find(|(ix, filter_type)| **filter_type == filter) {
+            let prev = if ix > 0 {
+                Some(self.filter_order[ix - 1])
+            } else {
+                None
+            };
+
+            let next = if ix < self.filter_order.len() - 1 {
+                Some(self.filter_order[ix + 1])
+            } else {
+                None
+            };
+
+            let ctx = Self::get_context_from_canvas(&self.base_canvas);
+
+            match (prev, next) {
+                (None, None) => {
+                    self.filter_order.pop();
+                    self.filter_layers.remove(&filter);
+
+                    photon_rs::putImageData(self.base_canvas.clone(), ctx, &mut self.base_image);
+                },
+                (Some(prev_filter), None) => {
+                    self.filter_order.pop();
+                    self.filter_layers.remove(&filter);
+
+                    if let Some(prev_image) = self.filter_layers.get_mut(&prev_filter) {
+                        photon_rs::putImageData(self.base_canvas.clone(), ctx, prev_image);
+                    }
+                },
+                (None, Some(next_filter)) => {
+                    unimplemented!()
+                },
+                (Some(prev_filter), Some(next_filter)) => {
+                    unimplemented!()
+                }
+            }
+        }
     }
 }
 
