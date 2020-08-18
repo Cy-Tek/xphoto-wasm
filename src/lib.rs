@@ -1,11 +1,11 @@
 pub mod filter;
 
+use crate::filter::{get_filter_name, FilterType};
 use photon_rs::transform::SamplingFilter;
-use photon_rs::{PhotonImage, base64_to_image};
+use photon_rs::PhotonImage;
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
-use crate::filter::{FilterType, get_filter_name};
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -19,7 +19,7 @@ pub struct ImageManager {
     base_preview_image: Option<PhotonImage>,
     filter_layers: HashMap<FilterType, PhotonImage>,
     filter_previews: HashMap<FilterType, PhotonImage>,
-    filter_order: Vec<FilterType>
+    filter_order: Vec<FilterType>,
 }
 
 #[wasm_bindgen]
@@ -34,7 +34,7 @@ impl ImageManager {
             base_preview_image: None,
             filter_layers: HashMap::new(),
             filter_previews: HashMap::new(),
-            filter_order: Vec::new()
+            filter_order: Vec::new(),
         }
     }
 
@@ -72,8 +72,7 @@ impl ImageManager {
                 );
                 photon_rs::filters::filter(&mut copy, &filter_name);
 
-                self.filter_previews
-                    .insert(filter, copy);
+                self.filter_previews.insert(filter, copy);
 
                 let copy = self.filter_previews.get_mut(&filter).unwrap();
 
@@ -93,20 +92,23 @@ impl ImageManager {
             PhotonImage::new(
                 self.base_image.get_raw_pixels(),
                 self.base_image.get_width(),
-                self.base_image.get_height()
+                self.base_image.get_height(),
             )
         } else {
-            if let Some(image) = self.filter_layers.get_mut(self.filter_order.last().unwrap()) {
+            if let Some(image) = self
+                .filter_layers
+                .get_mut(self.filter_order.last().unwrap())
+            {
                 PhotonImage::new(
                     image.get_raw_pixels(),
                     image.get_width(),
-                    image.get_height()
+                    image.get_height(),
                 )
             } else {
                 PhotonImage::new(
                     self.base_image.get_raw_pixels(),
                     self.base_image.get_width(),
-                    self.base_image.get_height()
+                    self.base_image.get_height(),
                 )
             }
         };
@@ -119,7 +121,14 @@ impl ImageManager {
     }
 
     pub fn remove_filter(&mut self, filter: FilterType) {
-        if let Some((ix, name)) = self.filter_order.iter().enumerate().find(|(ix, filter_type)| **filter_type == filter) {
+        self.filter_layers.remove(&filter);
+
+        if let Some((ix, _name)) = self
+            .filter_order
+            .iter()
+            .enumerate()
+            .find(|(_ix, filter_type)| **filter_type == filter)
+        {
             let prev = if ix > 0 {
                 Some(self.filter_order[ix - 1])
             } else {
@@ -137,23 +146,18 @@ impl ImageManager {
             match (prev, next) {
                 (None, None) => {
                     self.filter_order.pop();
-                    self.filter_layers.remove(&filter);
-
                     photon_rs::putImageData(self.base_canvas.clone(), ctx, &mut self.base_image);
-                },
+                }
                 (Some(prev_filter), None) => {
                     self.filter_order.pop();
-                    self.filter_layers.remove(&filter);
 
                     if let Some(prev_image) = self.filter_layers.get_mut(&prev_filter) {
                         photon_rs::putImageData(self.base_canvas.clone(), ctx, prev_image);
                     }
-                },
-                (None, Some(next_filter)) => {
-                    unimplemented!()
-                },
-                (Some(prev_filter), Some(next_filter)) => {
-                    unimplemented!()
+                }
+                _ => {
+                    self.filter_order.remove(ix);
+                    self.rerender_layers(ix);
                 }
             }
         }
@@ -164,5 +168,46 @@ impl ImageManager {
     fn get_context_from_canvas(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
         let ctx: JsValue = canvas.get_context("2d").unwrap().unwrap().into();
         ctx.into()
+    }
+
+    fn rerender_layers(&mut self, start_index: usize) {
+        for ix in start_index..self.filter_order.len() {
+            let filter = self.filter_order[ix];
+            let filter_name = &get_filter_name(filter);
+
+            let image = if ix > 0 {
+                let prev_filter = self.filter_order[ix - 1];
+                match self.filter_layers.get(&prev_filter) {
+                    Some(image) => image,
+                    None => &self.base_image,
+                }
+            } else {
+                &self.base_image
+            };
+
+            let mut copy = PhotonImage::new(
+                image.get_raw_pixels(),
+                image.get_width(),
+                image.get_height(),
+            );
+
+            photon_rs::filters::filter(&mut copy, filter_name);
+            self.filter_layers.insert(filter, copy);
+        }
+
+        let ctx = Self::get_context_from_canvas(&self.base_canvas);
+        let final_layer = self
+            .filter_layers
+            .get_mut(self.filter_order.last().unwrap())
+            .unwrap();
+
+        photon_rs::putImageData(self.base_canvas.clone(), ctx, final_layer);
+
+        if self.base_preview_image.is_some() {
+            let preview_image = self.base_preview_image.take().unwrap();
+            let (width, height) = (preview_image.get_width(), preview_image.get_height());
+
+            self.gen_filter_preview(width, height);
+        }
     }
 }

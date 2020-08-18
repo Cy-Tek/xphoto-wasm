@@ -18,12 +18,12 @@ pub enum FilterType {
     BlueChrome,
     Vintage,
     Perfume,
-    Serenity
+    Serenity,
 }
 
- /// Returns the stringified name of the given filter
- #[wasm_bindgen]
- pub fn get_filter_name(filter: FilterType) -> String {
+/// Returns the stringified name of the given filter
+#[wasm_bindgen]
+pub fn get_filter_name(filter: FilterType) -> String {
     match filter {
         FilterType::Oceanic => "oceanic",
         FilterType::Islands => "islands",
@@ -40,5 +40,6 @@ pub enum FilterType {
         FilterType::Vintage => "vintage",
         FilterType::Perfume => "perfume",
         FilterType::Serenity => "serenity",
-    }.to_string()
+    }
+    .to_string()
 }
